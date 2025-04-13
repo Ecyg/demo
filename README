@@ -1,0 +1,41 @@
+
+Mass Assignment
+---------------------------------------------------------------------------
+
+Using terminal, go to the folder containing the dockerfile and .php file
+
+Steps to test : 
+
+1. Build Dockerfile with docker build -t myos1 .
+
+2. Run the image with docker run -p 80:80 myos1
+
+3. Go to http://localhost/vulnerable_app.php
+
+4. Test for Mass Assignment
+
+
+XSS via HTTP Parameter Pollution
+-----------------------------------------------------------------------------
+
+Steps to test : 
+
+1. Go to http://localhost/xss_hpp.php
+
+2. Try to get XSS via the first "message" parameter.
+
+3. Try adding a second message parameter. 
+
+
+Type Juggling
+-------------------------------------------------------------------------------
+
+Steps to test : 
+
+1. Go to the Type Juggling page
+
+2. Attempt to login as "admin" with the password "123456"
+
+3. Now login with the password "0"
+
+4. Why did that work?
