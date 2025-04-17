@@ -19,10 +19,8 @@ RUN echo "<VirtualHost *:80>\n    DocumentRoot /var/www/html\n    <Directory /va
 RUN echo "RewriteEngine On\nRewriteCond %{REQUEST_URI} ^/$\nRewriteRule ^$ /index.php [L,R=301]" > /var/www/html/.htaccess
 
 # Add vulnerable PHP application and ensure index.php exists
-COPY index.php /var/www/html/index.php
-COPY vulnerable_app.php /var/www/html/vulnerable_app.php
-COPY xss_hpp.php /var/www/html/xss_hpp.php
-COPY type_juggling.php /var/www/html/type_juggling.php
+COPY . /var/www/html/
+
 
 # Expose port 80
 EXPOSE 80
