@@ -10,7 +10,7 @@ Steps to test :
 
 2. Run the image with docker run -p 80:80 myos1
 
-3. Go to http://localhost/vulnerable_app.php
+3. Go to the Mass Assignment page
 
 4. Test for Mass Assignment
 
@@ -20,7 +20,7 @@ XSS via HTTP Parameter Pollution
 
 Steps to test : 
 
-1. Go to http://localhost/xss_hpp.php
+1. Go to the XSS via HPP Parameter Pollution page.
 
 2. Try to get XSS via the first "message" parameter.
 
@@ -39,3 +39,18 @@ Steps to test :
 3. Now login with the password "0"
 
 4. Why did that work?
+
+Angular XSS
+-------------------------------------------------------------------------------
+
+Steps to test : 
+
+1. Go to the Angular XSS page
+
+2. Solutions : 
+
+1+1}} <script>alert('XSS')</script> {{
+
+or 
+
+';constructor.constructor('alert("XSS")')();'
