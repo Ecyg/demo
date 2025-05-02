@@ -54,3 +54,31 @@ Steps to test :
 or 
 
 ';constructor.constructor('alert("XSS")')();'
+
+
+HTTP Request Smuggling
+-------------------------------------------------------------------------------
+
+Steps to test:
+
+1. Go to http://localhost/request_smuggling.php
+
+2. Using a tool like Burp Suite or a custom script:
+   - Send a request with both Content-Length and Transfer-Encoding: chunked headers
+   - Use a smaller Content-Length than the actual message to trick the servers
+
+3. Example attack:
+   - Set "Content-Length: 57" 
+   - Set "Transfer-Encoding: chunked"
+   - In the request body use:
+     ```
+     0
+     
+     GET /admin HTTP/1.1
+     Host: localhost
+     
+     ```
+   - The front server (Apache) may use Transfer-Encoding, while the back-end (PHP-FPM) 
+     may use Content-Length, creating a desynchronization that allows request smuggling
+
+4. Check the logs displayed on the page to see evidence of the headers handling

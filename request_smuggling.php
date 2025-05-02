@@ -66,7 +66,7 @@
     <!-- Main Content Area -->
     <main class="main-content">
         <?php 
-        $contentFile = "content/home-content.php"; // Default content file
+        $contentFile = "content/request_smuggling-content.php"; // Default content file
         // This is where page-specific content will be included
         if (isset($contentFile) && file_exists($contentFile)) {
             include $contentFile;

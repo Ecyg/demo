@@ -37,6 +37,16 @@
                 <a href="https://secops.group/php-type-juggling-simplified/" class="btn">Learn More</a>
             </div>
         </div>
+        <div class="card">
+            <div class="card-image">
+                <img src="/api/placeholder/400/320" alt="Feature 4">
+            </div>
+            <div class="card-content">
+                <h3>HTTP Request Smuggling</h3>
+                <p>A vulnerability that occurs when front-end and back-end servers interpret HTTP requests differently, allowing attackers to "smuggle" unauthorized requests through security controls.</p>
+                <a href="https://portswigger.net/web-security/request-smuggling" class="btn">Learn More</a>
+            </div>
+        </div>
     </div>
 </section>
 
