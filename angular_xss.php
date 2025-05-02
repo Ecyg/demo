@@ -38,6 +38,7 @@
                     <li class="submenu-item"><a href="hpp.php">XSS via HTTP Parameter Pollution</a></li>
                     <li class="submenu-item"><a href="type_juggling.php">Type Juggling</a></li>
                     <li class="submenu-item"><a href="angular_xss.php">Angular XSS</a></li>
+                    <li class="submenu-item"><a href="request_smuggling.php">HTTP Request Smuggling</a></li>
                 </ul>
             </li>
             <li class="menu-item has-submenu">
