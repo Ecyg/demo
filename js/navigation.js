@@ -14,7 +14,9 @@ const siteNavigation = {
                 { label: "XSS via HTTP Parameter Pollution", url: "hpp.php" },
                 { label: "Type Juggling", url: "type_juggling.php" },
                 { label: "Angular XSS", url: "angular_xss.php" },
-                { label: "HTTP Request Smuggling", url: "request_smuggling.php" }
+                { label: "HTTP Request Smuggling", url: "request_smuggling.php" },
+                { label: "Reflected XSS", url: "reflected_xss.php" }
+
             ]
         },
         {
