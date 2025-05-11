@@ -1,62 +1,84 @@
 FROM ubuntu:latest
 
-# Install Apache, PHP-FPM and required modules
-RUN apt update && apt install -y apache2 php-fpm php libapache2-mod-php php-curl \
+# Install Apache, PHP and required modules
+RUN apt-get update && apt-get install -y apache2 php php-fpm libapache2-mod-php php-curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Enable required Apache modules
 RUN a2enmod rewrite proxy proxy_fcgi
 
+# Configure PHP to work with Apache directly
+RUN a2enconf php*-fpm
+
 # Enable .htaccess support
-RUN sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+RUN sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
-# Set the default DirectoryIndex to index.php
-RUN echo "<IfModule dir_module>\n    DirectoryIndex index.php index.html index.htm\n</IfModule>" > /etc/apache2/mods-enabled/dir.conf
-
-# Configure Apache to handle PHP via PHP-FPM
+# Create a minimal Apache site config
 RUN echo "<VirtualHost *:80>\n\
+    ServerAdmin webmaster@localhost\n\
     DocumentRoot /var/www/html\n\
+    ErrorLog \${APACHE_LOG_DIR}/error.log\n\
+    CustomLog \${APACHE_LOG_DIR}/access.log combined\n\
     <Directory /var/www/html>\n\
+        Options Indexes FollowSymLinks\n\
         AllowOverride All\n\
         Require all granted\n\
     </Directory>\n\
-    <FilesMatch \\.php$>\n\
-        SetHandler proxy:fcgi://127.0.0.1:9000\n\
-    </FilesMatch>\n\
 </VirtualHost>" > /etc/apache2/sites-available/000-default.conf
 
-# Create .htaccess to redirect "/" to "/template.php"
-RUN echo "RewriteEngine On\nRewriteCond %{REQUEST_URI} ^/$\nRewriteRule ^$ /template.php [R=302,L]" > /var/www/html/.htaccess
+# Create a backup PHP test file in case your app doesn't have one
+RUN echo "<?php\necho '<h1>Template Page</h1><p>Your server is working correctly!</p><p>PHP version: ' . phpversion() . '</p>';\n?>" > /var/www/html/template.php.bak
 
-# Find the PHP version and configure PHP-FPM properly
-RUN PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;') && \
-    echo "[www]\n\
-user = www-data\n\
-group = www-data\n\
-listen = 127.0.0.1:9000\n\
-pm = dynamic\n\
-pm.max_children = 5\n\
-pm.start_servers = 2\n\
-pm.min_spare_servers = 1\n\
-pm.max_spare_servers = 3\n\
-; Vulnerable configuration - larger buffer sizes\n\
-request_terminate_timeout = 300\n\
-security.limit_extensions = .php\n\
-; Setting a high value makes smuggling easier\n\
-request_slowlog_timeout = 60s\n\
-slowlog = /var/log/php-fpm.slow.log" > /etc/php/${PHP_VERSION}/fpm/pool.d/www.conf
+# Create a fallback index to redirect when no index exists
+RUN echo "<?php\nheader('Location: /template.php');\nexit;\n?>" > /var/www/html/index.php.bak
 
-# Add application files
+# Create a backup .htaccess
+RUN echo "RewriteEngine On\nRewriteRule ^$ /template.php [R=302,L]" > /var/www/html/.htaccess.bak
+
+# Copy all files from the build context to Apache's document root
 COPY . /var/www/html/
+
+# If template.php doesn't exist, use the backup
+RUN if [ ! -f /var/www/html/template.php ]; then \
+        cp /var/www/html/template.php.bak /var/www/html/template.php; \
+    fi
+
+# If index.php doesn't exist, use the backup
+RUN if [ ! -f /var/www/html/index.php ]; then \
+        cp /var/www/html/index.php.bak /var/www/html/index.php; \
+    fi
+
+# If .htaccess doesn't exist, use the backup
+RUN if [ ! -f /var/www/html/.htaccess ]; then \
+        cp /var/www/html/.htaccess.bak /var/www/html/.htaccess; \
+    fi
+
+# Fix permissions for all files
+RUN chown -R www-data:www-data /var/www/html/ \
+    && find /var/www/html/ -type d -exec chmod 755 {} \; \
+    && find /var/www/html/ -type f -exec chmod 644 {} \; \
+    && chmod 755 /var/www/html/*.php
+
+# Set PHP config to ensure it works properly
+RUN PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;') \
+    && echo "opcache.enable=1\nopcache.enable_cli=1\nopcache.memory_consumption=128\nopcache.interned_strings_buffer=8\nopcache.max_accelerated_files=4000\nopcache.revalidate_freq=60\n" >> /etc/php/${PHP_VERSION}/fpm/php.ini \
+    && echo "opcache.enable=1\nopcache.enable_cli=1\nopcache.memory_consumption=128\nopcache.interned_strings_buffer=8\nopcache.max_accelerated_files=4000\nopcache.revalidate_freq=60\n" >> /etc/php/${PHP_VERSION}/apache2/php.ini
 
 # Expose port 80
 EXPOSE 80
 
-# Create a startup script to run both Apache and PHP-FPM
-RUN echo "#!/bin/bash\n\
-PHP_VERSION=\$(php -r 'echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;')\n\
-service php\${PHP_VERSION}-fpm start\n\
-/usr/sbin/apache2ctl -D FOREGROUND" > /start.sh && chmod +x /start.sh
+# Create a simple and reliable startup script
+RUN echo '#!/bin/bash\n\
+echo "Starting PHP-FPM..."\n\
+PHP_VERSION=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;")\n\
+service php${PHP_VERSION}-fpm start\n\
+status=$?\n\
+if [ $status -ne 0 ]; then\n\
+    echo "Failed to start PHP-FPM: $status"\n\
+    exit $status\n\
+fi\n\
+\n\
+echo "Starting Apache..."\n\
+exec apache2ctl -D FOREGROUND\n' > /start.sh && chmod +x /start.sh
 
-# Run the startup script
 CMD ["/start.sh"]

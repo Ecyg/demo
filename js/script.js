@@ -27,17 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
         body.classList.remove('sidebar-open');
     });
     
-    // Handle submenu toggles
-    const submenuToggles = document.querySelectorAll('.submenu-toggle');
-    
-    submenuToggles.forEach(toggle => {
-        toggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            const submenu = this.nextElementSibling;
-            submenu.classList.toggle('active');
-        });
-    });
-    
     // Handle navigation via hash changes
     function handleHashChange() {
         const hash = window.location.hash;
@@ -71,14 +60,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Close sidebar when clicking a menu item (optional, good for mobile)
-    const menuItems = document.querySelectorAll('.menu-item > a:not(.submenu-toggle)');
-    menuItems.forEach(item => {
-        item.addEventListener('click', function() {
-            if (window.innerWidth <= 768) {
-                sidebar.classList.remove('active');
-                sidebarOverlay.classList.remove('active');
-                body.classList.remove('sidebar-open');
-            }
-        });
+    document.addEventListener('click', function(e) {
+        // Using event delegation to handle dynamically created menu items
+        if (e.target.closest('.menu-item > a:not(.submenu-toggle)') && window.innerWidth <= 768) {
+            sidebar.classList.remove('active');
+            sidebarOverlay.classList.remove('active');
+            body.classList.remove('sidebar-open');
+        }
     });
 });
