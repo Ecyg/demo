@@ -35,6 +35,11 @@ RUN echo "<?php\nheader('Location: /template.php');\nexit;\n?>" > /var/www/html/
 # Create a backup .htaccess
 RUN echo "RewriteEngine On\nRewriteRule ^$ /template.php [R=302,L]" > /var/www/html/.htaccess.bak
 
+# Install Ollama
+RUN apt-get update && apt-get install -y curl && \
+    curl -fsSL https://ollama.com/install.sh | sh && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy all files from the build context to Apache's document root
 COPY . /var/www/html/
 
@@ -64,11 +69,23 @@ RUN PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;') \
     && echo "opcache.enable=1\nopcache.enable_cli=1\nopcache.memory_consumption=128\nopcache.interned_strings_buffer=8\nopcache.max_accelerated_files=4000\nopcache.revalidate_freq=60\n" >> /etc/php/${PHP_VERSION}/fpm/php.ini \
     && echo "opcache.enable=1\nopcache.enable_cli=1\nopcache.memory_consumption=128\nopcache.interned_strings_buffer=8\nopcache.max_accelerated_files=4000\nopcache.revalidate_freq=60\n" >> /etc/php/${PHP_VERSION}/apache2/php.ini
 
-# Expose port 80
-EXPOSE 80
+# Expose ports 80 (Apache) and 11434 (Ollama)
+EXPOSE 80 11434
 
 # Create a simple and reliable startup script
 RUN echo '#!/bin/bash\n\
+echo "Starting Ollama..."\n\
+ollama serve &\n\
+OLLAMA_PID=$!\n\
+\n\
+# Wait for Ollama to be ready\n\
+echo "Waiting for Ollama to start..."\n\
+sleep 10\n\
+\n\
+# Pull llama2 model\n\
+echo "Pulling llama3.2 model..."\n\
+ollama pull llama3.2\n\
+\n\
 echo "Starting PHP-FPM..."\n\
 PHP_VERSION=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;")\n\
 service php${PHP_VERSION}-fpm start\n\
