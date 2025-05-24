@@ -17,7 +17,8 @@ const siteNavigation = {
                 { label: "Angular XSS", url: "angular_xss.php" },
                 { label: "HTTP Request Smuggling", url: "request_smuggling.php" },
                 { label: "Reflected XSS", url: "reflected_xss.php" },
-                { label : "Reflected XSS (more)", url: "reflected_xss2.php" }
+                { label : "Reflected XSS (more)", url: "reflected_xss2.php" },
+                { label : "OS Command Injection", "url" : "os_command_injection.php" }
             ]
         },
         {
