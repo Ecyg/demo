@@ -74,18 +74,6 @@ EXPOSE 80 11434
 
 # Create a simple and reliable startup script
 RUN echo '#!/bin/bash\n\
-echo "Starting Ollama..."\n\
-ollama serve &\n\
-OLLAMA_PID=$!\n\
-\n\
-# Wait for Ollama to be ready\n\
-echo "Waiting for Ollama to start..."\n\
-sleep 10\n\
-\n\
-# Pull llama2 model\n\
-echo "Pulling llama3.2 model..."\n\
-ollama pull llama3.2\n\
-\n\
 echo "Starting PHP-FPM..."\n\
 PHP_VERSION=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;")\n\
 service php${PHP_VERSION}-fpm start\n\
