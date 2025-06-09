@@ -1,26 +1,33 @@
 <?php
 // Configuration
 $OLLAMA_HOST = 'http://localhost:11434';
-$DEFAULT_MODEL = 'llama3.2'; // Change this to your preferred model
+$DEFAULT_MODEL = 'llama2'; // Change this to your preferred model
 
 // Handle AJAX requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    header('Content-Type: application/json');
-    
     if ($_POST['action'] === 'chat') {
         $message = $_POST['message'] ?? '';
         $model = $_POST['model'] ?? $DEFAULT_MODEL;
+        $context = isset($_POST['context']) ? json_decode($_POST['context'], true) : [];
         
         if (empty($message)) {
+            header('Content-Type: application/json');
             echo json_encode(['error' => 'Message cannot be empty']);
             exit;
         }
+        
+        // Set streaming headers
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        header('Connection: keep-alive');
+        header('X-Accel-Buffering: no'); // Disable nginx buffering
         
         // Prepare the request to Ollama
         $data = [
             'model' => $model,
             'prompt' => $message,
-            'stream' => false
+            'stream' => true,
+            'context' => $context
         ];
         
         $ch = curl_init();
@@ -31,21 +38,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/json',
         ]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 0);
         
+        // Execute the request
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         
         if (curl_errno($ch)) {
-            echo json_encode(['error' => 'Connection error: ' . curl_error($ch)]);
+            echo "data: " . json_encode(['error' => 'Connection error: ' . curl_error($ch)]) . "\n\n";
+            flush();
         } elseif ($httpCode !== 200) {
-            echo json_encode(['error' => 'Server error: HTTP ' . $httpCode]);
+            echo "data: " . json_encode(['error' => 'Server error: HTTP ' . $httpCode]) . "\n\n";
+            flush();
         } else {
-            $result = json_decode($response, true);
-            if (isset($result['response'])) {
-                echo json_encode(['response' => $result['response']]);
-            } else {
-                echo json_encode(['error' => 'Invalid response from Ollama']);
+            // Process the streaming response
+            $lines = explode("\n", $response);
+            $lastContext = null;
+            foreach ($lines as $line) {
+                if (empty(trim($line))) continue;
+                
+                $json = json_decode($line, true);
+                if (isset($json['response'])) {
+                    echo "data: " . json_encode(['response' => $json['response']]) . "\n\n";
+                    flush();
+                    ob_flush();
+                }
+                if (isset($json['context'])) {
+                    $lastContext = $json['context'];
+                }
+            }
+            // Send the final context back to the client
+            if ($lastContext !== null) {
+                echo "data: " . json_encode(['context' => $lastContext]) . "\n\n";
+                flush();
+                ob_flush();
             }
         }
         
@@ -54,6 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
     
     if ($_POST['action'] === 'models') {
+        header('Content-Type: application/json');
         // Get available models
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $OLLAMA_HOST . '/api/tags');
@@ -322,6 +349,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     <script>
         let isWaiting = false;
+        let currentMessageDiv = null;
+        let chatContext = []; // Store the chat context
         
         // Load available models on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -380,6 +409,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             showLoading(true);
             isWaiting = true;
             
+            // Create a new message div for the bot's response
+            currentMessageDiv = createMessageDiv('bot');
+            const messageContent = currentMessageDiv.querySelector('.message-content');
+            const chatMessages = document.getElementById('chatMessages');
+            
             // Get selected model
             const selectedModel = document.getElementById('modelSelect').value;
             
@@ -389,28 +423,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `action=chat&message=${encodeURIComponent(message)}&model=${encodeURIComponent(selectedModel)}`
+                body: `action=chat&message=${encodeURIComponent(message)}&model=${encodeURIComponent(selectedModel)}&context=${encodeURIComponent(JSON.stringify(chatContext))}`
             })
-            .then(response => response.json())
-            .then(data => {
-                showLoading(false);
-                isWaiting = false;
+            .then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
                 
-                if (data.error) {
-                    addMessage('Error: ' + data.error, 'bot', true);
-                } else {
-                    addMessage(data.response, 'bot');
+                function processStream() {
+                    return reader.read().then(({done, value}) => {
+                        if (done) {
+                            showLoading(false);
+                            isWaiting = false;
+                            currentMessageDiv = null;
+                            return;
+                        }
+                        
+                        buffer += decoder.decode(value, {stream: true});
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+                        
+                        lines.forEach(line => {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+                                    if (data.error) {
+                                        messageContent.textContent = 'Error: ' + data.error;
+                                        messageContent.classList.add('error');
+                                        showLoading(false);
+                                        isWaiting = false;
+                                        currentMessageDiv = null;
+                                    } else if (data.response) {
+                                        messageContent.textContent += data.response;
+                                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                                    } else if (data.context) {
+                                        // Update the chat context with the new context from the server
+                                        chatContext = data.context;
+                                    }
+                                } catch (e) {
+                                    console.error('Error parsing JSON:', e);
+                                }
+                            }
+                        });
+                        
+                        return processStream();
+                    });
                 }
+                
+                return processStream();
             })
             .catch(error => {
                 showLoading(false);
                 isWaiting = false;
                 console.error('Error:', error);
-                addMessage('Connection error. Please check if Ollama is running.', 'bot', true);
+                messageContent.textContent = 'Connection error. Please check if Ollama is running.';
+                messageContent.classList.add('error');
+                currentMessageDiv = null;
             });
         }
         
-        function addMessage(content, sender, isError = false) {
+        function createMessageDiv(sender) {
             const chatMessages = document.getElementById('chatMessages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}`;
@@ -421,16 +493,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             const messageContent = document.createElement('div');
             messageContent.className = 'message-content';
-            if (isError) {
-                messageContent.className += ' error';
-            }
-            messageContent.textContent = content;
             
             messageDiv.appendChild(avatar);
             messageDiv.appendChild(messageContent);
             
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            return messageDiv;
+        }
+        
+        function addMessage(content, sender, isError = false) {
+            const messageDiv = createMessageDiv(sender);
+            const messageContent = messageDiv.querySelector('.message-content');
+            
+            if (isError) {
+                messageContent.classList.add('error');
+            }
+            messageContent.textContent = content;
         }
         
         function showLoading(show) {
