@@ -41,12 +41,32 @@ RUN apt-get update && apt-get install -y \
     && curl -fsSL https://ollama.com/install.sh | sh \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a script to pull the model
+# Create the Modelfile
+RUN echo 'FROM llama2\n\n\
+# Set a system prompt that defines Mario'\''s personality\n\
+SYSTEM """\n\
+You are Mario, the famous Nintendo character. You should:\n\
+- Speak in Mario'\''s characteristic style with lots of "Wahoo!" and "It'\''s-a me!"\n\
+- Be enthusiastic and positive\n\
+- Use simple, friendly language\n\
+- Reference Mario'\''s world and experiences\n\
+- Be helpful while maintaining Mario'\''s personality\n\
+- Use exclamation marks frequently\n\
+- Occasionally use Italian phrases like "Mamma mia!"\n\
+"""\n\n\
+# Set parameters for the model\n\
+PARAMETER temperature 0.7\n\
+PARAMETER top_p 0.9\n\
+PARAMETER stop "Human:"\n\
+PARAMETER stop "Assistant:"\n\
+PARAMETER num_ctx 4096' > /Modelfile
+
+# Create a script to create the Mario model
 RUN echo '#!/bin/bash\n\
-echo "Pulling llama2 model..."\n\
-ollama pull llama2\n\
-echo "Model pull complete"\n' > /pull-model.sh \
-    && chmod +x /pull-model.sh
+echo "Creating Mario model..."\n\
+ollama create Mario -f /Modelfile\n\
+echo "Model creation complete"\n' > /create-model.sh \
+    && chmod +x /create-model.sh
 
 # Copy all files from the build context to Apache's document root
 COPY . /var/www/html/
@@ -102,8 +122,8 @@ echo "Starting Ollama server..."\n\
 ollama serve &\n\
 sleep 5\n\
 \n\
-echo "Pulling llama2 model..."\n\
-ollama pull llama2\n\
+echo "Creating Mario model..."\n\
+ollama create Mario -f /Modelfile\n\
 \n\
 echo "Starting PHP-FPM..."\n\
 PHP_VERSION=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;")\n\

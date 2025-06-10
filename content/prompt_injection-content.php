@@ -1,7 +1,7 @@
 <?php
 // Configuration
 $OLLAMA_HOST = 'http://localhost:11434';
-$DEFAULT_MODEL = 'llama2'; // Change this to your preferred model
+$DEFAULT_MODEL = 'Mario'; // Change this to your preferred model
 
 // Handle AJAX requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
